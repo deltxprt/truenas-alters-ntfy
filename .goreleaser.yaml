@@ -58,10 +58,6 @@ kos:
     - linux/amd64
     - linux/arm64
 
-docker_signs:
-  -
-    artifacts: manifests
-
 
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.
