@@ -81,12 +81,14 @@ var (
 	apikey     string
 	ntfyUrl    string
 	ntfyTopic  string
+	interval   int64
 )
 
 func getAlerts() ([]TruenasAlerts, error) {
 	//slog.Info("url: " + truenasUrl)
 	url := truenasUrl + "/api/v2.0/alert/list"
 	var nasAlerts []TruenasAlerts
+	//var currentAlerts []TruenasAlerts
 	token := "Bearer " + apikey
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -116,12 +118,18 @@ func getAlerts() ([]TruenasAlerts, error) {
 		return nasAlerts, err
 	}
 
+	for i := 0; i < len(nasAlerts); i++ {
+		if nasAlerts[i].Datetime.Date >= interval {
+			nasAlerts = append(nasAlerts[:i], nasAlerts[i+1:]...)
+		}
+	}
+
 	return nasAlerts, nil
 }
 
 func CreateNtfyMessage(alerts TruenasAlerts) NtfyMessage {
-	alertTime := time.Unix(alerts.Datetime.Date/1000, 0).Format("2006/01/02 15:04:05")
-	lastOccTime := time.Unix(alerts.LastOccurrence.Date/1000, 0).Format("2006/01/02 15:04:05")
+	alertTime := time.UnixMilli(alerts.Datetime.Date).Format("2006/01/02 15:04:05")
+	lastOccTime := time.UnixMilli(alerts.LastOccurrence.Date).Format("2006/01/02 15:04:05")
 	message := fmt.Sprintf(`
 Level:%s
 Time: %s
@@ -205,10 +213,16 @@ func sendNtfy(content NtfyMessage) error {
 }
 
 func main() {
+	currentTime := time.Now()
 	truenasUrl = os.Getenv("TRUENASURL")
 	apikey = os.Getenv("APIKEY")
 	ntfyUrl = os.Getenv("NTFYURL")
 	ntfyTopic = os.Getenv("TOPIC")
+	duration, err := time.ParseDuration(os.Getenv("INTERVAL"))
+	if err != nil {
+		slog.Error("unable to parse time", err)
+	}
+	interval = currentTime.Add(-duration).UnixMilli()
 
 	//slog.Info("sending to " + ntfyUrl + " with topic: " + ntfyTopic)
 	alerts, err := getAlerts()
